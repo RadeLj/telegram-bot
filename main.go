@@ -57,7 +57,7 @@ func main() {
 			if err != nil {
 				log.Println("Telegram send error:", err)
 			} else {
-				log.Println("Message sent successfully!!")
+				log.Println("Message sent successfully!!2")
 			}
 		}
 	}
