@@ -35,11 +35,10 @@ if [ ! -f "$ENV_FILE" ]; then
     touch "$ENV_FILE"
 fi
 
-# Load existing env vars
+# Load env vars and prompt for missing ones
 set -o allexport
 source "$ENV_FILE"
 
-# Prompt for missing vars
 if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     read -p "Enter your TELEGRAM_BOT_TOKEN: " BOT_TOKEN
     echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
@@ -53,7 +52,7 @@ if [ -z "$TELEGRAM_CHAT_ID" ]; then
 fi
 set +o allexport
 
-# 5. Build initially
+# 5. Build the bot initially
 echo "[INFO] Building the bot..."
 go build -o telegram-bot
 if [ $? -ne 0 ]; then
@@ -61,30 +60,29 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 6. Run auto-update + bot loop in foreground
+# 6. Kill any old bot instance
+pkill -f telegram-bot 2>/dev/null
+
+# 7. Start the main loop: auto-update + foreground bot
 while true; do
     # Check for updates
     git fetch origin main
     LOCAL=$(git rev-parse HEAD)
     REMOTE=$(git rev-parse origin/main)
-    echo "[INFO] No new commit detected!"
+
     if [ "$LOCAL" != "$REMOTE" ]; then
-        echo "[INFO] New commit detected. Pulling and rebuilding..."
+        echo "[INFO] New commit detected. Updating bot..."
         git reset --hard
         git clean -fd
         git pull origin main
+        pkill -f telegram-bot 2>/dev/null
         go build -o telegram-bot
         echo "[INFO] Bot rebuilt."
     fi
 
-    # Kill old bot if running
-    pkill -f telegram-bot 2>/dev/null
-
-    # Start bot in foreground (you will see logs here)
-    echo "[INFO] Starting bot..."
+    # Start bot in foreground and wait for it to exit
+    echo "[INFO] Starting bot... (Ctrl+C to stop)"
     ./telegram-bot
-
-    # If the bot crashes, wait a few seconds before restarting
     echo "[WARN] Bot stopped unexpectedly. Restarting in 5s..."
     sleep 5
 done
