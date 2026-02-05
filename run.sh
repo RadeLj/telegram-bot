@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# === Termux Telegram Bot Full Setup ===
+# === Termux Telegram Bot Full Setup (No tmux) ===
 
 # 1. Update & install required packages
 pkg update -y && pkg upgrade -y
-pkg install -y git golang procps nano curl tmux
+pkg install -y git golang procps nano curl
 
 # 2. Go to home directory
 cd $HOME
@@ -25,16 +25,17 @@ else
     cd "$REPO_DIR"
 fi
 
-# 4. Create .env file if it doesn't exist
+# 4. Ensure .env exists and load env vars
 ENV_FILE="$REPO_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
     touch "$ENV_FILE"
 fi
 
-# Load env vars and prompt for missing ones
+# Load existing env vars
 set -o allexport
 source "$ENV_FILE"
 
+# Prompt for missing vars
 if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     read -p "Enter your TELEGRAM_BOT_TOKEN: " BOT_TOKEN
     echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
@@ -49,9 +50,14 @@ fi
 set +o allexport
 
 # 5. Build the bot initially
+echo "[INFO] Building the bot..."
 go build -o telegram-bot
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Go build failed. Fix errors first."
+    exit 1
+fi
 
-# 6. Create auto-update + run loop script
+# 6. Create update_and_run.sh script
 UPDATE_SCRIPT="$REPO_DIR/update_and_run.sh"
 cat > "$UPDATE_SCRIPT" << 'EOF'
 #!/bin/bash
@@ -59,9 +65,7 @@ cat > "$UPDATE_SCRIPT" << 'EOF'
 cd $HOME/telegram-bot
 
 # Load env vars
-set -o allexport
-source .env
-set +o allexport
+export $(grep -v '^#' .env | xargs)
 
 while true; do
     # Check for updates
@@ -91,18 +95,9 @@ EOF
 
 chmod +x "$UPDATE_SCRIPT"
 
-# 7. Start everything in a tmux session
-SESSION_NAME="telegram-bot"
-
-# Kill any old session & bot
-tmux kill-session -t $SESSION_NAME 2>/dev/null
+# 7. Kill any previous bot instance
 pkill -f telegram-bot 2>/dev/null
 
-# Start a new session running the update_and_run script
-tmux new-session -d -s $SESSION_NAME "$UPDATE_SCRIPT"
-
-echo "[DONE] Setup complete!!"
-echo "The bot is running in tmux session '$SESSION_NAME'."
-echo "Attach to see logs: tmux attach -t $SESSION_NAME"
-echo "Detach safely: Ctrl+B then D"
-echo "Bot log: $REPO_DIR/bot.log"
+# 8. Start the update_and_run loop directly in this terminal
+echo "[INFO] Starting update + bot loop. Logs will appear below..."
+"$UPDATE_SCRIPT"
