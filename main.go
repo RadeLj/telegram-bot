@@ -87,10 +87,10 @@ func fetchPrices() (string, error) {
 
 	msg := fmt.Sprintf(
 		"<b>Price Update</b>\n"+
-			"BTC: $%.2f | 1h: %.2f%% | 24h: %.2f%%\n"+
-			"ETH: $%.2f | 1h: %.2f%% | 24h: %.2f%%",
-		btc["usd"], btc["usd_1h_change"], btc["usd_24h_change"],
-		eth["usd"], eth["usd_1h_change"], eth["usd_24h_change"],
+			"BTC: $%.2f | 24h: %.2f%%\n"+
+			"ETH: $%.2f | 24h: %.2f%%",
+		btc["usd"], btc["usd_24h_change"],
+		eth["usd"], eth["usd_24h_change"],
 	)
 	return msg, nil
 }
