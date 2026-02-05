@@ -25,27 +25,28 @@ else
     cd "$REPO_DIR"
 fi
 
-# 4. Create .env file if it doesn't exist or missing required variables
+# 4. Create .env file if it doesn't exist
 ENV_FILE="$REPO_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
     touch "$ENV_FILE"
 fi
 
-# Load existing env vars if present
+# Load env vars and prompt for missing ones
+set -o allexport
 source "$ENV_FILE"
 
-# Prompt for missing vars
 if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     read -p "Enter your TELEGRAM_BOT_TOKEN: " BOT_TOKEN
     echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
-    export TELEGRAM_BOT_TOKEN=$BOT_TOKEN
+    TELEGRAM_BOT_TOKEN=$BOT_TOKEN
 fi
 
 if [ -z "$TELEGRAM_CHAT_ID" ]; then
     read -p "Enter your TELEGRAM_CHAT_ID: " CHAT_ID
     echo "TELEGRAM_CHAT_ID=$CHAT_ID" >> "$ENV_FILE"
-    export TELEGRAM_CHAT_ID=$CHAT_ID
+    TELEGRAM_CHAT_ID=$CHAT_ID
 fi
+set +o allexport
 
 # 5. Build the bot initially
 go build -o telegram-bot
@@ -62,7 +63,6 @@ set -o allexport
 source .env
 set +o allexport
 
-# Infinite loop for auto-update & crash recovery
 while true; do
     # Check for updates
     git fetch origin main
@@ -70,7 +70,7 @@ while true; do
     REMOTE=$(git rev-parse origin/main)
 
     if [ "$LOCAL" != "$REMOTE" ]; then
-        echo "[INFO] Changes detected. Pulling and rebuilding..."
+        echo "[INFO] New commit detected. Pulling and rebuilding..."
         git reset --hard
         git clean -fd
         git pull origin main
@@ -80,8 +80,9 @@ while true; do
 
     # Restart bot if not running
     if ! pgrep -f telegram-bot >/dev/null; then
-        echo "[INFO] Bot is not running. Starting..."
-        nohup ./telegram-bot > bot.log 2>&1 &
+        echo "[INFO] Bot not running. Starting..."
+        ./telegram-bot > bot.log 2>&1 &
+        echo "[INFO] Bot started."
     fi
 
     sleep 60
@@ -93,13 +94,14 @@ chmod +x "$UPDATE_SCRIPT"
 # 7. Start everything in a tmux session
 SESSION_NAME="telegram-bot"
 
-# Kill any old session
+# Kill any old session & bot
 tmux kill-session -t $SESSION_NAME 2>/dev/null
+pkill -f telegram-bot 2>/dev/null
 
 # Start a new session running the update_and_run script
 tmux new-session -d -s $SESSION_NAME "$UPDATE_SCRIPT"
 
-echo "[DONE] Setup complete!"
+echo "[DONE] Setup complete!!"
 echo "The bot is running in tmux session '$SESSION_NAME'."
 echo "Attach to see logs: tmux attach -t $SESSION_NAME"
 echo "Detach safely: Ctrl+B then D"
