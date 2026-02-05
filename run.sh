@@ -1,14 +1,69 @@
 #!/bin/bash
 
-cd $HOME/telegram-bot
+# === Termux Telegram Bot Full Setup (Foreground + Auto-update) ===
 
-# Load env vars
+# 1. Update & install required packages
+pkg update -y && pkg upgrade -y
+pkg install -y git golang procps nano curl
+
+# Optional: keep CPU awake so Android doesn't kill it
+pkg install -y termux-api
+termux-wake-lock
+
+# 2. Go to home directory
+cd $HOME
+
+# 3. Clone repo or pull latest if it exists
+REPO_URL="https://github.com/RadeLj/telegram-bot.git"
+REPO_DIR="$HOME/telegram-bot"
+
+if [ -d "$REPO_DIR" ]; then
+    echo "[INFO] Repo exists. Pulling latest changes..."
+    cd "$REPO_DIR"
+    git reset --hard
+    git clean -fd
+    git pull origin main
+else
+    echo "[INFO] Cloning repo..."
+    git clone "$REPO_URL"
+    cd "$REPO_DIR"
+fi
+
+# 4. Ensure .env exists and load env vars
+ENV_FILE="$REPO_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    touch "$ENV_FILE"
+fi
+
+# Load existing env vars
 set -o allexport
-source .env
+source "$ENV_FILE"
+
+# Prompt for missing vars
+if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+    read -p "Enter your TELEGRAM_BOT_TOKEN: " BOT_TOKEN
+    echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
+    TELEGRAM_BOT_TOKEN=$BOT_TOKEN
+fi
+
+if [ -z "$TELEGRAM_CHAT_ID" ]; then
+    read -p "Enter your TELEGRAM_CHAT_ID: " CHAT_ID
+    echo "TELEGRAM_CHAT_ID=$CHAT_ID" >> "$ENV_FILE"
+    TELEGRAM_CHAT_ID=$CHAT_ID
+fi
 set +o allexport
 
+# 5. Build initially
+echo "[INFO] Building the bot..."
+go build -o telegram-bot
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Go build failed. Fix errors first."
+    exit 1
+fi
+
+# 6. Run auto-update + bot loop in foreground
 while true; do
-    # 1. Check for updates
+    # Check for updates
     git fetch origin main
     LOCAL=$(git rev-parse HEAD)
     REMOTE=$(git rev-parse origin/main)
@@ -22,14 +77,14 @@ while true; do
         echo "[INFO] Bot rebuilt."
     fi
 
-    # 2. Kill old bot if still running
+    # Kill old bot if running
     pkill -f telegram-bot 2>/dev/null
 
-    # 3. Start bot in background
-    nohup ./telegram-bot > bot.log 2>&1 &
-    BOT_PID=$!
-    echo "[INFO] Bot running with PID $BOT_PID"
+    # Start bot in foreground (you will see logs here)
+    echo "[INFO] Starting bot..."
+    ./telegram-bot
 
-    # 4. Wait 60s before next update check
-    sleep 60
+    # If the bot crashes, wait a few seconds before restarting
+    echo "[WARN] Bot stopped unexpectedly. Restarting in 5s..."
+    sleep 5
 done
