@@ -58,7 +58,9 @@ cat > "$UPDATE_SCRIPT" << 'EOF'
 cd $HOME/telegram-bot
 
 # Load env vars
-export $(grep -v '^#' .env | xargs)
+set -o allexport
+source .env
+set +o allexport
 
 # Infinite loop for auto-update & crash recovery
 while true; do
