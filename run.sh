@@ -4,10 +4,7 @@
 
 # 1. Update & install required packages
 pkg update -y && pkg upgrade -y
-pkg install -y git golang procps nano curl
-
-# Optional: install tmux if you want manual session management
-pkg install -y tmux
+pkg install -y git golang procps nano curl tmux
 
 # 2. Go to home directory
 cd $HOME
@@ -34,17 +31,20 @@ if [ ! -f "$ENV_FILE" ]; then
     touch "$ENV_FILE"
 fi
 
-# Ensure required vars are present
+# Load existing env vars if present
 source "$ENV_FILE"
 
+# Prompt for missing vars
 if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
     read -p "Enter your TELEGRAM_BOT_TOKEN: " BOT_TOKEN
     echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> "$ENV_FILE"
+    export TELEGRAM_BOT_TOKEN=$BOT_TOKEN
 fi
 
 if [ -z "$TELEGRAM_CHAT_ID" ]; then
     read -p "Enter your TELEGRAM_CHAT_ID: " CHAT_ID
     echo "TELEGRAM_CHAT_ID=$CHAT_ID" >> "$ENV_FILE"
+    export TELEGRAM_CHAT_ID=$CHAT_ID
 fi
 
 # 5. Build the bot initially
@@ -88,12 +88,17 @@ EOF
 
 chmod +x "$UPDATE_SCRIPT"
 
-# 7. Start the bot forever with nohup
-echo "[INFO] Starting bot and auto-update loop..."
-nohup "$UPDATE_SCRIPT" > setup.log 2>&1 &
+# 7. Start everything in a tmux session
+SESSION_NAME="telegram-bot"
+
+# Kill any old session
+tmux kill-session -t $SESSION_NAME 2>/dev/null
+
+# Start a new session running the update_and_run script
+tmux new-session -d -s $SESSION_NAME "$UPDATE_SCRIPT"
 
 echo "[DONE] Setup complete!"
-echo "The bot is running in the background. Logs:"
-echo " - Bot output: $REPO_DIR/bot.log"
-echo " - Setup logs: $REPO_DIR/setup.log"
-echo "To see live logs: tail -f $REPO_DIR/bot.log"
+echo "The bot is running in tmux session '$SESSION_NAME'."
+echo "Attach to see logs: tmux attach -t $SESSION_NAME"
+echo "Detach safely: Ctrl+B then D"
+echo "Bot log: $REPO_DIR/bot.log"
