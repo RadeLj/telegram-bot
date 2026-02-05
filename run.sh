@@ -67,7 +67,7 @@ while true; do
     git fetch origin main
     LOCAL=$(git rev-parse HEAD)
     REMOTE=$(git rev-parse origin/main)
-
+    echo "[INFO] No new commit detected"
     if [ "$LOCAL" != "$REMOTE" ]; then
         echo "[INFO] New commit detected. Pulling and rebuilding..."
         git reset --hard
