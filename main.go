@@ -34,9 +34,9 @@ func main() {
 		log.Fatalf("Failed to create Telegram bot: %v", err)
 	}
 
-	log.Println("Bot started, polling prices every 1 min...")
+	log.Println("Bot started, polling prices every 10 min...")
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
 	for {
